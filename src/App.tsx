@@ -70,14 +70,13 @@ const getServiceColor = (name: string) => {
   return palette[Math.abs(hash) % palette.length];
 };
 
-// COLE AQUI OS DADOS QUE VOCÊ COPIOU DO CONSOLE DO FIREBASE
 const firebaseConfig = {
-  apiKey: "AIzaSyBhaWVwppQ8jCCC-ypHw3vVsV60k8C-F1U",
-  authDomain: "rastreadordemandapro.firebaseapp.com",
-  projectId: "rastreadordemandapro",
-  storageBucket: "rastreadordemandapro.firebasestorage.app",
-  messagingSenderId: "515944342855",
-  appId: "1:515944342855:web:2a34d7967f0bc4fc8fd862"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -86,14 +85,6 @@ const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 const auth = getAuth(app);
-
-// Helper for ID generation that works in non-secure contexts (HTTP/Network IP)
-const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-};
 
 // Initial Data
 const DEFAULT_BUTTONS: ButtonConfig[] = [
@@ -256,7 +247,7 @@ export default function App() {
   const registerDemand = async (label: string) => {
     try {
       await addDoc(collection(db, "logs"), {
-        service: label,
+        service: label.toUpperCase(),
         timestamp: new Date().toISOString(),
       });
       if (successAudio.readyState >= 2) successAudio.play().catch(() => {});
