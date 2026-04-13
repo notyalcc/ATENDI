@@ -1,0 +1,48 @@
+$env:PATH = "C:\Users\7700608246\Desktop\node-v24.13.0-win-x64;$env:PATH"
+
+$env:PATH = "C:\Users\Desktop\node-v24.13.0-win-x64;$env:PATH"    C:\Program Files
+
+$env:PATH = "C:\Program Files\nodejs\node.exe;$env:PATH"
+
+
+cmd /c "npm install firebase"
+
+$env:PATH = "C:\Users\7700608246\Desktop\node-v24.13.0-win-x64;$env:PATH"
+cmd /c "npm install"
+
+
+cmd /c ""npm install""
+
+
+$env:PATH = "C:\Users\7700608246\Desktop\node-v24.13.0-win-x64;$env:PATH"
+cmd /c "npm run dev -- --host"
+
+cmd /c "npm run build"
+
+
+Depois de fazer essa alteração, se quiser atualizar o site online,
+ basta rodar 
+
+ cmd /c "npm run build"
+ 
+  novamente e arrastar a nova pasta dist para o Netlify.
+
+
+
+
+  cmd /c "npm install electron electron-builder --save-dev"
+
+
+  cmd /c "npm run electron:build"
+
+
+$env:PATH = "C:\Users\7700608246\Desktop\node-v24.13.0-win-x64;$env:PATH"
+cmd /c "npm run clean && npm run electron:build"
+
+
+
+$env:PATH = "C:\Users\7700608246\Desktop\node-v24.13.0-win-x64;$env:PATH"
+cmd /c "npm run clean && npm run electron:build"
+
+
+
