@@ -79,6 +79,11 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// Validação básica de ambiente para evitar tela branca em produção
+if (!firebaseConfig.apiKey) {
+  console.error("ERRO: Variáveis de ambiente do Firebase não encontradas. Verifique seu arquivo .env");
+}
+
 const app = initializeApp(firebaseConfig);
 // Inicializa o Firestore com cache local persistente (Modo Offline)
 const db = initializeFirestore(app, {
@@ -116,7 +121,7 @@ export default function App() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalValue, setModalValue] = useState('');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
-  const [modalConfirmAction, setModalAction] = useState<{ type: 'add' | 'edit', id?: string } | null>(null);
+  const [modalConfirmAction, setModalAction] = useState<{ type: 'add' | 'edit' | 'delete_log' | 'delete_button' | 'error', id?: string, serviceLabel?: string } | null>(null);
 
   // Sincronização em tempo real com Firebase (Logs e Botões)
   useEffect(() => {
@@ -167,7 +172,8 @@ export default function App() {
       } else {
         setIsAuthenticated(false);
         setIsAdmin(false);
-        // Se deslogou, tenta conectar anonimamente para manter o Firebase pronto
+        // Só conecta anonimamente se não houver um erro de auth pendente
+        console.log("Sessão finalizada.");
         signInAnonymously(auth).catch(err => console.error("Erro ao iniciar sessão anônima:", err));
       }
     });
@@ -201,10 +207,18 @@ export default function App() {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       console.error("Erro no login:", error);
-      const errorMsg = error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential'
-        ? 'Usuário ou senha inválidos.'
-        : 'Erro ao acessar o Firebase: ' + error.message;
-      alert(errorMsg);
+      let errorMsg = 'Erro ao acessar o Firebase: ' + error.message;
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMsg = 'Usuário ou senha inválidos.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMsg = 'Este domínio (github.io) não está autorizado no Console do Firebase > Authentication > Settings.';
+      }
+
+      setModalTitle('Erro de Acesso');
+      setModalValue(errorMsg);
+      setModalAction({ type: 'error' });
+      setIsModalOpen(true);
     }
   };
 
@@ -214,21 +228,38 @@ export default function App() {
 
   // Modal Action Handler
   const handleModalConfirm = async () => {
-    if (!modalValue.trim()) return;
-
     try {
       if (modalConfirmAction?.type === 'add') {
+        if (!modalValue.trim()) return;
         await addDoc(collection(db, "buttons"), { label: modalValue.toUpperCase() });
       } else if (modalConfirmAction?.type === 'edit' && modalConfirmAction.id) {
+        if (!modalValue.trim()) return;
         await updateDoc(doc(db, "buttons", modalConfirmAction.id), { label: modalValue.toUpperCase() });
+      } else if (modalConfirmAction?.type === 'delete_log' && modalConfirmAction.id) {
+        await deleteDoc(doc(db, "logs", modalConfirmAction.id));
+        if (deleteAudio.readyState >= 2) deleteAudio.play().catch(() => {});
+      } else if (modalConfirmAction?.type === 'delete_button' && modalConfirmAction.id) {
+        await deleteDoc(doc(db, "buttons", modalConfirmAction.id));
+        if (deleteAudio.readyState >= 2) deleteAudio.play().catch(() => {});
       }
-      setIsModalOpen(false);
+      
+      // Fecha o modal e limpa o estado
+      closeModal();
       setModalValue('');
       setModalAction(null);
     } catch (error: any) {
       console.error("Erro ao salvar botão:", error);
-      alert("❌ Erro ao salvar: " + (error.code === 'permission-denied' ? "Você não tem permissão para alterar as configurações. Verifique se o login admin está ativo." : error.message));
+      setModalTitle('Erro de Permissão');
+      setModalValue(error.code === 'permission-denied' ? "Você não tem permissão para alterar as configurações." : error.message);
+      setModalAction({ type: 'error' });
+      setIsModalOpen(true);
     }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalValue('');
+    setModalAction(null);
   };
 
   // Audio para feedback de sucesso
@@ -250,10 +281,15 @@ export default function App() {
         service: label.toUpperCase(),
         timestamp: new Date().toISOString(),
       });
-      if (successAudio.readyState >= 2) successAudio.play().catch(() => {});
+      successAudio.play().catch(e => console.warn("Autoplay de áudio bloqueado ou erro:", e));
     } catch (error: any) {
       console.error("Erro ao registrar:", error);
-      alert("Erro ao registrar: " + (error.code === 'permission-denied' ? "Sem permissão no Firebase." : error.message));
+      setModalTitle('Erro de Sincronização');
+      setModalValue(error.code === 'permission-denied' 
+        ? "Você não tem permissão para registrar dados. Verifique se o login está ativo." 
+        : "Falha ao enviar para o servidor. O registro ficará salvo localmente.");
+      setModalAction({ type: 'error' });
+      setIsModalOpen(true);
     }
   };
 
@@ -267,20 +303,11 @@ export default function App() {
       return;
     }
 
-    const timeLabel = format(parseISO(lastLog.timestamp), 'HH:mm:ss');
-    if (confirm(`Remover o último registro de "${label}" feito às ${timeLabel}?`)) {
-      try {
-        await deleteDoc(doc(db, "logs", lastLog.id));
-        if (deleteAudio.readyState >= 2) deleteAudio.play().catch(() => {});
-      } catch (error: any) {
-        console.error("Erro ao excluir do Firebase:", error);
-        if (error.code === 'permission-denied') {
-          alert("❌ ACESSO NEGADO: Suas regras do Firebase não permitem que este computador exclua dados. Verifique se o ID de Conexão no console (F12) é o mesmo que você colou nas Rules.");
-        } else {
-          alert("Erro ao excluir: " + error.message);
-        }
-      }
-    }
+    // Em vez de confirm(), usamos nosso modal
+    setModalTitle(`Excluir registro de ${label}?`);
+    setModalValue(`Confirmar exclusão do atendimento realizado às ${format(parseISO(lastLog.timestamp), 'HH:mm:ss')}?`);
+    setModalAction({ type: 'delete_log', id: lastLog.id });
+    setIsModalOpen(true);
   };
 
   const exportToCSV = () => {
@@ -615,11 +642,11 @@ export default function App() {
                           </button>)}
                           {isAdmin && (
                             <button 
-                            onClick={async () => {
-                              if (confirm(`Excluir o botão "${btn.label}"?`)) {
-                                await deleteDoc(doc(db, "buttons", btn.id));
-                                deleteAudio.play().catch(e => console.error("Erro ao tocar som de exclusão:", e));
-                              }
+                            onClick={() => {
+                              setModalTitle('Excluir Botão');
+                              setModalValue(`Tem certeza que deseja excluir o botão "${btn.label}"? Esta ação não pode ser desfeita.`);
+                              setModalAction({ type: 'delete_button', id: btn.id });
+                              setIsModalOpen(true);
                             }}
                             className={cn("p-2 rounded-lg transition-colors", theme === 'dark' ? 'hover:bg-rose-500/10 text-rose-400' : 'hover:bg-rose-100 text-rose-600')}
                           >
@@ -661,29 +688,39 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className={cn("w-full max-w-sm rounded-3xl p-6 shadow-2xl", theme === 'dark' ? 'bg-slate-900 border border-white/10' : 'bg-white border border-gray-200')}
             >
-              <h3 className={cn("text-lg font-bold mb-4 uppercase tracking-tight", theme === 'dark' ? 'text-white' : 'text-gray-900')}>{modalTitle}</h3>
-              <input 
-                autoFocus
-                type="text"
-                value={modalValue}
-                onChange={(e) => setModalValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleModalConfirm()}
-                className={cn("w-full rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 transition-all outline-none mb-6", theme === 'dark' ? 'bg-slate-950 border border-white/5 text-white' : 'bg-gray-50 border border-gray-300 text-gray-900')}
-                placeholder="Digite o nome..."
-              />
+              <h3 className={cn("text-lg font-bold mb-2 uppercase tracking-tight", theme === 'dark' ? 'text-white' : 'text-gray-900')}>{modalTitle}</h3>
+              
+              {modalConfirmAction?.type === 'delete_log' || modalConfirmAction?.type === 'delete_button' || modalConfirmAction?.type === 'error' ? (
+                <p className={cn("mb-6 text-sm", theme === 'dark' ? 'text-slate-400' : 'text-gray-600')}>
+                  {modalValue}
+                </p>
+              ) : (
+                <input 
+                  autoFocus
+                  type="text"
+                  value={modalValue}
+                  onChange={(e) => setModalValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleModalConfirm()}
+                  className={cn("w-full rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 transition-all outline-none mb-6", theme === 'dark' ? 'bg-slate-950 border border-white/5 text-white' : 'bg-gray-50 border border-gray-300 text-gray-900')}
+                  placeholder="Digite o nome..."
+                />
+              )}
+
               <div className="flex justify-end gap-3">
                 <button 
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className={cn("px-4 py-2 font-semibold transition-colors", theme === 'dark' ? 'text-[#D2DAE2]/60 hover:text-white' : 'text-gray-600 hover:text-gray-900')}
                 >
-                  Cancelar
+                  {modalConfirmAction?.type === 'error' ? 'Fechar' : 'Cancelar'}
                 </button>
-                <button 
-                  onClick={handleModalConfirm}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-xl transition-all shadow-lg shadow-blue-500/20"
-                >
-                  Confirmar
-                </button>
+                {modalConfirmAction?.type !== 'error' && (
+                  <button 
+                    onClick={handleModalConfirm}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    Confirmar
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>

@@ -48,8 +48,9 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true, // Habilita o uso de módulos Node.js no renderizador (cuidado com segurança)
-      contextIsolation: false, // Desabilita o isolamento de contexto para facilitar a integração (cuidado com segurança)
+      nodeIntegration: false, 
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'), // Use um preload script para expor APIs se necessário
     },
   });
 

@@ -2,7 +2,7 @@
   "name": "rastreador-demanda-pro",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://clayy.github.io/ATENDI",
+  "homepage": "https://notyalcc.github.io/ATENDI",
   "description": "Sistema Pro de Rastreamento de Demanda",
   "author": "Seu Nome",
   "type": "module",
@@ -30,7 +30,7 @@
       "main.js"
     ],
     "directories": {
-      "output": "dist"
+      "output": "dist_electron"
     }
   },
   "dependencies": {
