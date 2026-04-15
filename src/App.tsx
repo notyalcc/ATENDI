@@ -361,7 +361,7 @@ export default function App() {
                 <LayoutDashboard className="text-white w-8 h-8" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">CONTROLE DE ATENDIMENTO</h1>
+            <h1 className={cn("text-2xl font-bold tracking-tight", theme === 'dark' ? 'text-white' : 'text-gray-900')}>CONTROLE DE ATENDIMENTO</h1>
             <p className="text-[#D2DAE2]/60 text-sm mt-1">Acesse o sistema de registro</p>
           </div>
 
@@ -421,7 +421,7 @@ export default function App() {
           <div>
             <h2 className={cn("font-bold leading-none", theme === 'dark' ? 'text-white' : 'text-gray-900')}>Controle de Atendimento</h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] text-[#D2DAE2]/50 uppercase tracking-widest font-semibold">Painel Pro</span>
+              <span className={cn("text-[10px] uppercase tracking-widest font-semibold", theme === 'dark' ? 'text-[#D2DAE2]/50' : 'text-gray-500')}>Painel Pro</span>
               <div className={cn(
                 "flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter",
                 isOffline ? "bg-amber-500/10 text-amber-500" : isSyncing ? "bg-blue-500/10 text-blue-400 animate-pulse" : "bg-emerald-500/10 text-emerald-400"
@@ -471,7 +471,7 @@ export default function App() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Hoje</p>
-                    <p className="text-2xl font-black text-white">{totalToday}</p>
+                    <p className={cn("text-2xl font-black", theme === 'dark' ? 'text-white' : 'text-gray-900')}>{totalToday}</p>
                   </div>
                 </div>
               </div>
@@ -648,7 +648,7 @@ export default function App() {
           )}
 
           <footer className="mt-12 pb-8 text-center opacity-30">
-            <p className="text-[10px] uppercase tracking-[0.4em] font-bold text-[#D2DAE2] flex items-center justify-center gap-2">
+            <p className={cn("text-[10px] uppercase tracking-[0.4em] font-bold flex items-center justify-center gap-2", theme === 'dark' ? 'text-[#D2DAE2]' : 'text-gray-600')}>
               © {new Date().getFullYear()} • 
               <a 
                 href="https://github.com/notyalcc" 
