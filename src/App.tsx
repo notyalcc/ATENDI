@@ -58,16 +58,27 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // Função para gerar uma cor vibrante e consistente baseada no nome do serviço
-const getServiceColor = (name: string) => {
-  const palette = [
-    '#38bdf8', '#4ade80', '#fbbf24', '#f87171', '#818cf8', 
-    '#2dd4bf', '#fb7185', '#a78bfa', '#f472b6', '#60a5fa'
-  ];
+const GRADIENT_PALETTE = [
+  { start: '#0ea5e9', end: '#2563eb' }, // Sky para Blue
+  { start: '#10b981', end: '#059669' }, // Emerald
+  { start: '#f59e0b', end: '#d97706' }, // Amber
+  { start: '#f43f5e', end: '#e11d48' }, // Rose
+  { start: '#8b5cf6', end: '#7c3aed' }, // Violet
+  { start: '#06b6d4', end: '#0891b2' }, // Cyan
+  { start: '#6366f1', end: '#4f46e5' }, // Indigo
+  { start: '#ec4899', end: '#db2777' }, // Pink
+  { start: '#14b8a6', end: '#0d9488' }, // Teal
+  { start: '#f97316', end: '#ea580c' }, // Orange
+];
+
+const getServiceColorIndex = (name: string) => {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return palette[Math.abs(hash) % palette.length];
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return Math.abs(hash) % GRADIENT_PALETTE.length;
+};
+
+const getServiceColor = (name: string) => {
+  return GRADIENT_PALETTE[getServiceColorIndex(name)].start;
 };
 
 const firebaseConfig = {
@@ -78,6 +89,8 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+console.log("Firebase Config carregada:", firebaseConfig.apiKey ? "OK" : "ERRO: Chave Vazia");
 
 const app = initializeApp(firebaseConfig);
 // Inicializa o Firestore com cache local persistente (Modo Offline)
@@ -783,7 +796,7 @@ function SummaryCard({ label, value, icon, gradient, theme }: { label: string, v
 }
 
 function StatsSection({ title, logs, period, theme }: { title: string, logs: DemandLog[], period: Period, theme: 'dark' | 'light' }) {
-  const data = useMemo(() => {
+  const { data, total } = useMemo(() => {
     const counts: Record<string, number> = {};
     const now = new Date();
     
@@ -804,13 +817,15 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
-    const total = chartDataRaw.reduce((sum, item) => sum + item.value, 0);
+    const totalCount = chartDataRaw.reduce((sum, item) => sum + item.value, 0);
 
-    return chartDataRaw.map(item => ({
+    const formattedData = chartDataRaw.map(item => ({
       ...item,
-      percentage: total > 0 ? Math.round((item.value / total) * 100) : 0,
-      displayLabel: `${item.value} (${total > 0 ? Math.round((item.value / total) * 100) : 0}%)`
+      percentage: totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
+      displayLabel: `${item.value} (${totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0}%)`
     }));
+
+    return { data: formattedData, total: totalCount };
   }, [logs, period]);
 
   const subtitle = useMemo(() => {
@@ -840,9 +855,17 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
           <BarChart3 className="text-blue-400 w-5 h-5" />
           <h2 className={cn("text-lg font-bold tracking-tight", theme === 'dark' ? 'text-white' : 'text-gray-900')}>{title}</h2>
         </div>
-        <span className={cn("text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider", theme === 'dark' ? 'text-[#D2DAE2]/40 bg-[#1E272E]' : 'text-gray-500 bg-gray-100')}>
-          {subtitle}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "text-xs font-bold px-3 py-1 rounded-full border shadow-sm",
+            theme === 'dark' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-100'
+          )}>
+            Total: {total}
+          </span>
+          <span className={cn("text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider", theme === 'dark' ? 'text-[#D2DAE2]/40 bg-[#1E272E]' : 'text-gray-500 bg-gray-100')}>
+            {subtitle}
+          </span>
+        </div>
       </div>
 
       {data.length === 0 ? (
@@ -853,37 +876,68 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
       ) : (
         <div className="flex flex-col gap-6">
           {/* Distribuição Percentual (Pizza) */}
-          <div className="h-[220px] w-full">
+          <div className="h-[280px] w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <defs>
+                  {GRADIENT_PALETTE.map((g, i) => (
+                    <linearGradient key={`pie-grad-${period}-${i}`} id={`pie-grad-${period}-${i}`} x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor={g.start} />
+                      <stop offset="100%" stopColor={g.end} />
+                    </linearGradient>
+                  ))}
+                </defs>
                 <Pie
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  paddingAngle={5}
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={4}
                   dataKey="value"
-                  // Ajuste da cor da etiqueta dentro da pizza
                   label={({ cx, cy, midAngle, innerRadius, outerRadius, percentage }) => {
                     const RADIAN = Math.PI / 180;
-                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                    const radius = outerRadius + 20;
                     const x = cx + radius * Math.cos(-midAngle * RADIAN);
                     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                    return percentage > 5 ? (
-                      <text x={x} y={y} fill={theme === 'dark' ? '#fff' : '#1f2937'} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                    return percentage > 2 ? (
+                      <text x={x} y={y} fill={theme === 'dark' ? '#94A3B8' : '#64748B'} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight="600">
                         {`${percentage}%`}
                       </text>
                     ) : null;
                   }}
                 >
                   {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getServiceColor(entry.name)} />
+                    <Cell key={`cell-${index}`} fill={`url(#pie-grad-${period}-${getServiceColorIndex(entry.name)})`} />
                   ))}
                 </Pie>
-                <Tooltip // Tooltip para o gráfico de pizza
-                  contentStyle={theme === 'dark' ? { backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' } : { backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  itemStyle={{ fontWeight: 'bold' }}
+                {/* Texto Centralizado no Donut */}
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
+                  <tspan 
+                    x="50%" 
+                    dy="-0.5em" 
+                    fontSize="12" 
+                    fontWeight="bold" 
+                    fill={theme === 'dark' ? '#94a3b8' : '#64748b'} 
+                    style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                  >
+                    Total
+                  </tspan>
+                  <tspan 
+                    x="50%" 
+                    dy="1.2em" 
+                    fontSize="28" 
+                    fontWeight="900" 
+                    fill={theme === 'dark' ? '#ffffff' : '#1e293b'}
+                  >
+                    {total}
+                  </tspan>
+                </text>
+                <Tooltip
+                  contentStyle={theme === 'dark' 
+                    ? { backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px' } 
+                    : { backgroundColor: '#ffffff', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}
+                  itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
                   formatter={(value: number, name: string, props: any) => [`${value} atendimentos (${props.payload.percentage}%)`, 'Total']}
                 />
               </PieChart>
@@ -891,9 +945,17 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
           </div>
 
           {/* Gráfico de Barras */}
-          <div className="h-[250px] w-full">
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} layout="vertical" margin={{ left: 5, right: 80, top: 10, bottom: 10 }}>
+              <BarChart data={data} layout="vertical" margin={{ left: 10, right: 60, top: 0, bottom: 0 }}>
+              <defs>
+                {GRADIENT_PALETTE.map((g, i) => (
+                  <linearGradient key={`bar-grad-${period}-${i}`} id={`bar-grad-${period}-${i}`} x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor={g.start} />
+                    <stop offset="100%" stopColor={g.end} />
+                  </linearGradient>
+                ))}
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#1E272E' : '#e5e7eb'} horizontal={false} />
               <XAxis type="number" hide />
               <YAxis 
@@ -901,24 +963,25 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
                 type="category" 
                 stroke={theme === 'dark' ? '#D2DAE2' : '#4a4a4a'} 
                 fontSize={12} 
-                width={120}
+                width={100}
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: theme === 'dark' ? '#D2DAE2' : '#4a4a4a', fontWeight: 600 }}
               />
-              <Tooltip // Tooltip para o gráfico de barras
+              <Tooltip
                 cursor={{ fill: theme === 'dark' ? '#00A8FF' : '#a0c4ff', opacity: 0.05 }}
-                contentStyle={theme === 'dark' ? { backgroundColor: '#2F3640', border: '1px solid #1E272E', borderRadius: '12px' } : { backgroundColor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                contentStyle={theme === 'dark' ? { backgroundColor: '#2F3640', border: '1px solid #1E272E', borderRadius: '12px' } : { backgroundColor: '#ffffff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                 itemStyle={{ color: '#00A8FF', fontWeight: 'bold' }}
                 formatter={(value: number) => [`${value} atendimentos`, 'Total']}
               />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={24}>
+              <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={32}>
                 {data.map((entry, index) => {
-                  const color = getServiceColor(entry.name);
+                  const colorIndex = getServiceColorIndex(entry.name);
+                  const color = GRADIENT_PALETTE[colorIndex].start;
                   return (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={color}
+                      fill={`url(#bar-grad-${period}-${colorIndex})`}
                       style={{ filter: theme === 'dark' ? `drop-shadow(0px 0px 8px ${color}44)` : `drop-shadow(0px 0px 4px ${color}22)` }}
                     />
                   );
@@ -926,7 +989,7 @@ function StatsSection({ title, logs, period, theme }: { title: string, logs: Dem
                 <LabelList 
                   dataKey="value" 
                   position="right" 
-                  fill={theme === 'dark' ? '#FFFFFF' : '#333333'} 
+                  fill={theme === 'dark' ? '#94A3B8' : '#475569'} 
                   fontSize={12} 
                   fontWeight="bold"
                   offset={15}
